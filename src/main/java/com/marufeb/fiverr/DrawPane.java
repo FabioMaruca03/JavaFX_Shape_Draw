@@ -2,6 +2,7 @@ package com.marufeb.fiverr;
 
 //import any classes necessary here
 //----
+import javafx.event.EventType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.RadioButton;
@@ -10,6 +11,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Paint;
 import javafx.scene.shape.Shape;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.Arc;
@@ -36,6 +38,10 @@ public class DrawPane extends BorderPane
     private VBox left;
     private HBox controls;
     private Pane canvas;
+    private int shapeInfo = 1;
+    private Paint selectedColor = Paint.valueOf("Black");
+    private Shape currentShapeNode = null;
+    private double xs = -1, ys = -1, xe = -1, ye = -1;
     //declare any other necessary instance variables here
     //----
 
@@ -54,15 +60,20 @@ public class DrawPane extends BorderPane
         left = new VBox(20);
         left.setAlignment(Pos.CENTER);
         setLeft(left);
+        this.getLeft().prefWidth(400);
 
         controls = new HBox(40);
         controls.setAlignment(Pos.CENTER);
+        undoBtn.setOnAction(new ButtonHandler());
+        eraseBtn.setOnAction(new ButtonHandler());
         controls.getChildren().addAll(undoBtn, eraseBtn);
         setBottom(controls);
 
         //Create the color comboBox and initialize its default color
         colorCombo = new ComboBox<>();
         colorCombo.getItems().setAll("Black", "Red", "Blue", "Green", "Yellow", "Orange", "Pink");
+        colorCombo.getSelectionModel().select(0);
+        colorCombo.setOnAction(new ColorHandler());
         left.getChildren().add(colorCombo);
         //----
 
@@ -74,8 +85,12 @@ public class DrawPane extends BorderPane
         rbArc = new RadioButton("Arc");
         radioGroup = new ToggleGroup();
         rbRect.setToggleGroup(radioGroup);
+        rbRect.setSelected(true);
         rbCircle.setToggleGroup(radioGroup);
         rbArc.setToggleGroup(radioGroup);
+        rbRect.setOnAction(new ShapeHandler());
+        rbCircle.setOnAction(new ShapeHandler());
+        rbArc.setOnAction(new ShapeHandler());
         left.getChildren().addAll(rbRect, rbCircle, rbArc);
         //----
 
@@ -89,6 +104,8 @@ public class DrawPane extends BorderPane
 
         //Step #3: Register the source nodes with its handler objects
         canvas.setOnMousePressed(new MouseHandler());
+        canvas.setOnMouseDragged(new MouseHandler());
+        canvas.setOnMouseReleased(new MouseHandler());
         //----
         //----
 
@@ -105,10 +122,52 @@ public class DrawPane extends BorderPane
             //write your own codes here
             //----
 
+            System.out.println(event.getEventType().getName());
+            if (event.getEventType() == MouseEvent.MOUSE_PRESSED) {
+                xs = event.getX();
+                ys = event.getY();
+            }else if (event.getEventType() == MouseEvent.MOUSE_DRAGGED){
+                if (currentShapeNode != null) {
+                    canvas.getChildren().remove(currentShapeNode);
+                    shapeList.remove(currentShapeNode);
+                }
+                switch (shapeInfo) {
+                    case 1 : {
+                        xe = event.getX();
+                        ye = event.getY();
+                        currentShapeNode = new Rectangle(xs, ys, xe-xs, ye-ys);
+                        currentShapeNode.setFill(selectedColor);
+                        break;
+                    }
+                    case 2 : {
+                        xe = event.getX();
+                        ye = event.getY();
+                        double radius = Math.sqrt(Math.pow(xe-xs, 2) + Math.pow(ye-ys, 2));
+                        currentShapeNode = new Circle(xs, ys, radius);
+                        currentShapeNode.setFill(selectedColor);
+                        break;
+                    }
+                    case 3 : {
+                        xe = event.getX();
+                        ye = event.getY();
+                        double angle = Math.atan2(-(ys-ye), xe-xs);
+                        double length = Math.toDegrees(angle);
+                        Arc arc = new Arc(xs, ys, xe, xe/2, 0, length);
+                        arc.setType(ArcType.ROUND);
+                        currentShapeNode = arc;
+                        currentShapeNode.setFill(selectedColor);
 
+                        break;
+                    }
+                    default: break;
+                }
+                shapeList.add(currentShapeNode);
+                canvas.getChildren().add(currentShapeNode);
+            }else if (event.getEventType() == MouseEvent.MOUSE_RELEASED) {
+                currentShapeNode = null;
+            }
 
-
-
+            event.consume();
         }//end handle()
     }//end MouseHandler
 
@@ -118,10 +177,18 @@ public class DrawPane extends BorderPane
         public void handle(ActionEvent event)
         {
             //write your codes here
+            if (shapeList.size() > 0) {
+                if (event.getSource() == undoBtn) {
+                    System.out.println("Undo");
+                    canvas.getChildren().remove(shapeList.get(shapeList.size()-1));
+                    shapeList.remove(shapeList.size()-1);
+                } else {
+                    System.out.println("Clear");
+                    shapeList.clear();
+                    canvas.getChildren().clear();
+                }
+            }
             //----
-
-
-
         }
     }//end ButtonHandler
 
@@ -131,10 +198,14 @@ public class DrawPane extends BorderPane
         public void handle(ActionEvent event)
         {
             //write your own codes here
+            if (rbRect.isSelected())
+                shapeInfo = 1;
+            else if (rbCircle.isSelected())
+                shapeInfo = 2;
+            else shapeInfo = 3;
+
+            event.consume();
             //----
-
-
-
         }
     }//end ShapeHandler
 
@@ -144,8 +215,9 @@ public class DrawPane extends BorderPane
         public void handle(ActionEvent event)
         {
             //write your own codes here
+            selectedColor = Paint.valueOf(colorCombo.getSelectionModel().getSelectedItem());
+            event.consume();
             //----
-
         }
     }//end ColorHandler
 
